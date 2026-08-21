@@ -1,7 +1,6 @@
-> **SUPERSEDED (duplicate line)**  
-> This repository is **legacy** and was a parallel naming of the cognitive microservice.  
-> **Final form:** https://github.com/beyond-repair/sovereign-clean-room  
-> Do not develop further.
+> **⚠️ SUPERSEDED:** This repository is historical archive only. All active development has consolidated into **[sovereign-clean-room](https://github.com/beyond-repair/sovereign-clean-room)**.
+>
+> Parallel naming of the cognitive microservice — do not develop further.
 
 ---
 
