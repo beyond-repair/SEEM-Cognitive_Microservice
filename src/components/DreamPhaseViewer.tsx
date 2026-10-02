@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Activity, Zap, Target } from 'lucide-react';
+import { api } from '../api';
 
 interface DreamStats {
   dream_cycles: number;
@@ -12,25 +13,53 @@ interface DreamStats {
 export default function DreamPhaseViewer() {
   const [stats, setStats] = useState<DreamStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [originalId, setOriginalId] = useState('route_001');
+  const [skillName, setSkillName] = useState('test_skill');
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(api('/dream/stats'));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setStats(await response.json());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backend unreachable');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('http://localhost:8000/dream/stats');
-        const data = await response.json();
-        setStats(data);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const createVariant = async () => {
+    const response = await fetch(
+      api(`/dream/create-variant?original_id=${encodeURIComponent(originalId)}&skill_name=${encodeURIComponent(skillName)}`),
+      { method: 'POST' }
+    );
+    const body = await response.json();
+    setNotice(response.ok ? `created ${body.variant_id}` : 'create failed');
+    await fetchStats();
+  };
+
+  const runCycle = async () => {
+    const response = await fetch(
+      api(`/dream/run-cycle?original_id=${encodeURIComponent(originalId)}`),
+      { method: 'POST' }
+    );
+    const body = await response.json();
+    setNotice(
+      response.ok
+        ? `generation ${body.new_generation_size}, cycles ${body.cycle_count}, best ${body.best_variant_id ?? 'none'}`
+        : 'cycle failed'
+    );
+    await fetchStats();
+  };
 
   return (
     <div className="space-y-6">
@@ -40,31 +69,35 @@ export default function DreamPhaseViewer() {
             <Activity className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Dream Phase Engine</h2>
+            <h2 className="text-2xl font-bold text-white">Dream phase engine</h2>
             <p className="text-slate-400 text-sm mt-1">
-              Background consolidation of successful routes into permanent L3 MemSkills
+              Parameter variants in memory. A cycle does nothing until you create a variant. Consolidation
+              stays false until fitness, an exponential moving average, reaches 0.75.
             </p>
           </div>
         </div>
+        <div className="flex flex-wrap gap-3">
+          <input value={originalId} onChange={(e) => setOriginalId(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" aria-label="Original id" />
+          <input value={skillName} onChange={(e) => setSkillName(e.target.value)} className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" aria-label="Skill name" />
+          <button onClick={createVariant} className="px-4 py-2 bg-purple-600 rounded-lg text-white text-sm">Create variant</button>
+          <button onClick={runCycle} className="px-4 py-2 bg-pink-700 rounded-lg text-white text-sm">Run cycle</button>
+        </div>
+        {notice && <p className="text-sm text-slate-300 mt-3">{notice}</p>}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="text-slate-400">Loading dream statistics...</div>
-        </div>
+      {error && <p className="text-sm text-red-300">{error}</p>}
+      {loading && !stats ? (
+        <div className="text-slate-400">Loading dream statistics...</div>
       ) : stats ? (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {[
-            { label: 'Dream Cycles', value: stats.dream_cycles, color: 'from-purple-500 to-pink-600' },
-            { label: 'Total Variants', value: stats.total_variants, color: 'from-blue-500 to-cyan-600' },
-            { label: 'Consolidated Skills', value: stats.total_consolidated_skills, color: 'from-green-500 to-emerald-600' },
-            { label: 'Population Size', value: stats.population_size, color: 'from-yellow-500 to-orange-600' },
-            { label: 'Avg Fitness', value: stats.average_variant_fitness.toFixed(2), color: 'from-red-500 to-pink-600' },
+            { label: 'Dream cycles', value: stats.dream_cycles },
+            { label: 'Total variants', value: stats.total_variants },
+            { label: 'Consolidated skills', value: stats.total_consolidated_skills },
+            { label: 'Population size', value: stats.population_size },
+            { label: 'Avg fitness', value: stats.average_variant_fitness.toFixed(2) },
           ].map((item) => (
-            <div
-              key={item.label}
-              className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm"
-            >
+            <div key={item.label} className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
               <div className="text-xs text-slate-400 mb-2">{item.label}</div>
               <div className="text-3xl font-bold text-white">{item.value}</div>
             </div>
@@ -73,68 +106,27 @@ export default function DreamPhaseViewer() {
       ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Zap className="w-5 h-5 text-purple-400" />
-            Dream Cycle Process
+            Cycle steps that actually run
           </h3>
-          <div className="space-y-3 text-sm text-slate-400">
-            <div className="flex gap-3">
-              <div className="font-bold text-purple-400 min-w-fit">1. Selection</div>
-              <div>Elite routes selected by success rate and fitness</div>
-            </div>
-            <div className="flex gap-3">
-              <div className="font-bold text-purple-400 min-w-fit">2. Crossover</div>
-              <div>Recombine elite parameters for new variants</div>
-            </div>
-            <div className="flex gap-3">
-              <div className="font-bold text-purple-400 min-w-fit">3. Mutation</div>
-              <div>Perturb k_lambda and max_iterations for exploration</div>
-            </div>
-            <div className="flex gap-3">
-              <div className="font-bold text-purple-400 min-w-fit">4. Evaluation</div>
-              <div>Test variants on held-out evidence</div>
-            </div>
-            <div className="flex gap-3">
-              <div className="font-bold text-purple-400 min-w-fit">5. Consolidation</div>
-              <div>High-fitness routes promoted to L3 MemSkills</div>
-            </div>
+          <div className="space-y-2 text-sm text-slate-400">
+            <div>1. Keep the current elite (success rate, then fitness).</div>
+            <div>2. Fill the population with crossover or mutation of those elites.</div>
+            <div>3. There is no held-out task. Fitness only changes when you POST /dream/record-execution.</div>
           </div>
         </div>
-
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 text-pink-400" />
-            Consolidation Criteria
+            Defaults
           </h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-slate-300">Fitness Threshold</span>
-              <span className="font-mono text-slate-200">≥ 0.75</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-slate-300">Elite Size</span>
-              <span className="font-mono text-slate-200">5</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-slate-300">Crossover Rate</span>
-              <span className="font-mono text-slate-200">0.7</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
-              <span className="text-slate-300">Mutation Rate</span>
-              <span className="font-mono text-slate-200">0.15</span>
-            </div>
+          <div className="space-y-2 text-sm text-slate-300">
+            <div>Fitness threshold 0.75 (consolidation refuses below it)</div>
+            <div>Elite size 5, population 50, crossover 0.7, mutation 0.15</div>
           </div>
         </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30 p-6">
-        <h3 className="text-lg font-bold text-purple-200 mb-2">L3 MemSkills</h3>
-        <p className="text-sm text-purple-300/80">
-          Routes consolidated through Dream Phase become immutable L3 MemSkills stored in the L0
-          Supersede Graph. These represent the system's learned, executable knowledge - strategies that
-          proved successful across multiple contexts and are ready for reliable deployment.
-        </p>
       </div>
     </div>
   );

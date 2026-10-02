@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 
@@ -20,7 +20,7 @@ class NegativeSpike:
     failure_type: FailureType
     cosine_similarity: Optional[float] = None
     error_message: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -117,7 +117,7 @@ class BaNELEngine:
         stats = self.route_stats[route_id]
         stats.failure_count += 1
         stats.negative_spike_count += 1
-        stats.last_spike_at = datetime.utcnow().isoformat()
+        stats.last_spike_at = datetime.now(timezone.utc).isoformat()
 
         spike = NegativeSpike(
             route_id=route_id,

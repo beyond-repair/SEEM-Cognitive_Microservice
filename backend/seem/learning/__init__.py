@@ -1,4 +1,4 @@
-from .banel import BaNELEngine, NegativeSpike
+from .banel import BaNELEngine, FailureType, NegativeSpike
 from .dream import DreamPhaseEngine
 
-__all__ = ["BaNELEngine", "NegativeSpike", "DreamPhaseEngine"]
+__all__ = ["BaNELEngine", "FailureType", "NegativeSpike", "DreamPhaseEngine"]

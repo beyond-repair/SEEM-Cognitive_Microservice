@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Zap, AlertTriangle, TrendingDown } from 'lucide-react';
+import { api } from '../api';
 
 interface RouteStats {
   route_id: string;
@@ -11,52 +12,82 @@ interface RouteStats {
   negative_spike_count: number;
 }
 
+const FAILURE_TYPES = [
+  'unbind_failure',
+  'shacl_violation',
+  'execution_error',
+  'smt_unsat',
+  'timeout',
+  'unknown',
+];
+
 export default function BaNELMonitor() {
   const [stats, setStats] = useState<RouteStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [routeId, setRouteId] = useState('route_001');
+  const [failureType, setFailureType] = useState('unbind_failure');
+  const [cosine, setCosine] = useState('0.88');
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(api('/banel/routes'));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setStats(Array.isArray(data.routes) ? data.routes : []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backend unreachable');
+      setStats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('http://localhost:8000/banel/stats/sample_route');
-        if (response.ok) {
-          const data = await response.json();
-          setStats([data]);
-        } else {
-          setStats([
-            {
-              route_id: 'route_001',
-              success_count: 45,
-              failure_count: 8,
-              success_rate: 0.849,
-              avg_cosine_similarity: 0.94,
-              avg_iterations: 4.2,
-              negative_spike_count: 8,
-            },
-            {
-              route_id: 'route_002',
-              success_count: 32,
-              failure_count: 12,
-              success_rate: 0.727,
-              avg_cosine_similarity: 0.91,
-              avg_iterations: 5.1,
-              negative_spike_count: 12,
-            },
-          ]);
-        }
-      } catch {
-        setStats([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const recordFailure = async () => {
+    setNotice(null);
+    const response = await fetch(api('/banel/record-failure'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        route_id: routeId,
+        failure_type: failureType,
+        cosine_similarity: Number(cosine),
+        error_message: 'Recorded from the monitor',
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      setNotice(body.detail ?? 'Record failed');
+      return;
+    }
+    setNotice(
+      `suppression ${Number(body.suppression_level).toFixed(3)}; micro-dream flag ${String(body.should_micro_dream)}`
+    );
+    await fetchStats();
+  };
+
+  const recordSuccess = async () => {
+    setNotice(null);
+    const response = await fetch(
+      api(`/banel/record-success?route_id=${encodeURIComponent(routeId)}&cosine_similarity=1&iterations=1`),
+      { method: 'POST' }
+    );
+    if (!response.ok) {
+      setNotice('Success record failed');
+      return;
+    }
+    setNotice('Success recorded; suppression cleared for this route.');
+    await fetchStats();
+  };
 
   return (
     <div className="space-y-6">
@@ -66,17 +97,55 @@ export default function BaNELMonitor() {
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">BaNEL Learning Monitor</h2>
+            <h2 className="text-2xl font-bold text-white">BaNEL learning monitor</h2>
             <p className="text-slate-400 text-sm mt-1">
-              Bayesian Negative Evidence Learning - Track failure patterns and suppression levels
+              Counts failures you record. It does not ship sample routes. One failure on an empty route
+              crosses the 0.6 suppression flag because the failure rate is 1.
             </p>
           </div>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            value={routeId}
+            onChange={(e) => setRouteId(e.target.value)}
+            className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+            aria-label="Route id"
+          />
+          <select
+            value={failureType}
+            onChange={(e) => setFailureType(e.target.value)}
+            className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+            aria-label="Failure type"
+          >
+            {FAILURE_TYPES.map((kind) => (
+              <option key={kind} value={kind}>{kind}</option>
+            ))}
+          </select>
+          <input
+            value={cosine}
+            onChange={(e) => setCosine(e.target.value)}
+            className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+            aria-label="Cosine similarity"
+          />
+          <div className="flex gap-2">
+            <button onClick={recordFailure} className="flex-1 px-3 py-2 bg-orange-600 rounded-lg text-white text-sm">
+              Record failure
+            </button>
+            <button onClick={recordSuccess} className="flex-1 px-3 py-2 bg-emerald-700 rounded-lg text-white text-sm">
+              Record success
+            </button>
+          </div>
+        </div>
+        {notice && <p className="text-sm text-slate-300 mt-3">{notice}</p>}
       </div>
 
+      {error && <p className="text-sm text-red-300">{error}</p>}
+
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="text-slate-400">Loading route statistics...</div>
+        <div className="text-slate-400">Loading route statistics...</div>
+      ) : stats.length === 0 ? (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 text-slate-400 text-sm">
+          No routes yet. Record a failure or success above, or POST /banel/record-failure.
         </div>
       ) : (
         <div className="space-y-4">
@@ -84,96 +153,55 @@ export default function BaNELMonitor() {
             <div
               key={route.route_id}
               onClick={() => setSelectedRoute(selectedRoute === route.route_id ? null : route.route_id)}
-              className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all"
+              className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm cursor-pointer"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white">{route.route_id}</h3>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-white">
-                      {(route.success_rate * 100).toFixed(0)}%
-                    </div>
-                    <div className="text-xs text-slate-400">success rate</div>
-                  </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-white">{(route.success_rate * 100).toFixed(0)}%</div>
+                  <div className="text-xs text-slate-400">success rate</div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <div className="text-xs text-slate-400 mb-1">Successes</div>
-                  <div className="text-2xl font-bold text-green-400">{route.success_count}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400 mb-1">Failures</div>
-                  <div className="text-2xl font-bold text-red-400">{route.failure_count}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400 mb-1">Avg Cosine</div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {route.avg_cosine_similarity.toFixed(3)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400 mb-1">Avg Iterations</div>
-                  <div className="text-2xl font-bold text-cyan-400">
-                    {route.avg_iterations.toFixed(1)}
-                  </div>
-                </div>
+                <Stat label="Successes" value={String(route.success_count)} tone="text-green-400" />
+                <Stat label="Failures" value={String(route.failure_count)} tone="text-red-400" />
+                <Stat label="Avg cosine" value={route.avg_cosine_similarity.toFixed(3)} tone="text-blue-400" />
+                <Stat label="Avg iterations" value={route.avg_iterations.toFixed(1)} tone="text-cyan-400" />
               </div>
-
               <div className="flex items-center gap-2 text-sm text-orange-300">
                 <AlertTriangle className="w-4 h-4" />
                 <span>{route.negative_spike_count} negative spikes recorded</span>
               </div>
-
               {selectedRoute === route.route_id && (
-                <div className="mt-4 pt-4 border-t border-slate-700">
-                  <div className="text-xs text-slate-400 mb-3">Learning Metrics</div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Rejection Threshold:</span>
-                      <span className="text-slate-200">0.6</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Spike Decay Rate:</span>
-                      <span className="text-slate-200">0.95</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">Micro-Dream Timeout:</span>
-                      <span className="text-slate-200">50ms</span>
-                    </div>
-                  </div>
-                </div>
+                <p className="mt-4 text-xs text-slate-400">
+                  Rejection threshold 0.6. Spike decay 0.95 is applied when suppression is read, so the
+                  number on a later GET can be lower than the value returned at record time.
+                </p>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <TrendingDown className="w-5 h-5 text-orange-400" />
-            How BaNEL Works
-          </h3>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            BaNEL treats failures as strong negative evidence. When a route fails (low unbind
-            cosine, SHACL violation, or execution error), a negative spike is recorded. Exceeding
-            the rejection threshold triggers a Micro-Dream that mutates parameters and tests improvements.
-          </p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm">
-          <h3 className="text-lg font-bold text-white mb-4">Failure Types</h3>
-          <div className="space-y-2 text-sm text-slate-400">
-            <div>• Unbind Failure: Cosine similarity {'<'} 0.92</div>
-            <div>• SHACL Violation: Structure check failed</div>
-            <div>• Execution Error: Plugin threw exception</div>
-            <div>• SMT Unsat: Logical constraint unsatisfiable</div>
-            <div>• Timeout: Operation exceeded deadline</div>
-          </div>
-        </div>
+      <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
+        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+          <TrendingDown className="w-5 h-5 text-orange-400" />
+          What BaNEL does here
+        </h3>
+        <p className="text-sm text-slate-400">
+          A failure appends a spike and sets suppression from the failure rate plus a spike factor.
+          Crossing 0.6 sets should_micro_dream. This process does not then mutate a route by itself.
+        </p>
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-400 mb-1">{label}</div>
+      <div className={`text-2xl font-bold ${tone}`}>{value}</div>
     </div>
   );
 }

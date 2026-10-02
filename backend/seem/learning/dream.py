@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 
 
@@ -13,7 +13,7 @@ class RouteVariant:
     fitness: float = 0.0
     success_count: int = 0
     failure_count: int = 0
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -44,7 +44,7 @@ class ConsolidatedSkill:
     name: str
     variants: List[RouteVariant] = field(default_factory=list)
     best_variant_id: str = ""
-    consolidated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    consolidated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     total_success_count: int = 0
     total_failure_count: int = 0
     metadata: Dict[str, Any] = field(default_factory=dict)

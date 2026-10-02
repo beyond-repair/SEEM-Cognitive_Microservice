@@ -1,3 +1,5 @@
+> **Claim 0 note.** Design notes below are not measurements. The running code is an in-memory FHRR / counter / GA sketch. It is not a mind, and `SHACLValidator` does not execute RDF. See README.md.
+
 # SEEM 2.0 Blueprint: Sovereign Episodic Experience Microservice
 
 ## Executive Summary
