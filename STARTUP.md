@@ -1,8 +1,9 @@
 # SEEM 2.0 - Quick Start Guide
 
-## Start Your Engines! 🚀
+## Start the sketch
 
-SEEM 2.0 is now built and ready to run.
+Claim 0. In-memory only. Not a mind. See README.md for tests (`pytest`, `python demo.py`).
+
 
 ### In Terminal 1 (Backend)
 
@@ -51,9 +52,9 @@ You'll see the SEEM 2.0 dashboard with:
 
 ### 2. Monitor BaNEL Learning
 - Go to "BaNEL Monitor" tab
-- See simulated route statistics
-- Watch how failures trigger learning
-- Observe suppression levels
+- Record a failure or success (the list starts empty)
+- Read the suppression flag the API returns
+- Nothing is preloaded
 
 ### 3. View Dream Phase
 - Go to "Dream Phase" tab

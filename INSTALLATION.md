@@ -2,8 +2,8 @@
 
 ## System Requirements
 
-- **Python**: 3.10+
-- **Node.js**: 18+
+- **Python**: 3.11+
+- **Node.js**: 20+
 - **npm**: 9+
 - **OS**: Linux, macOS, or Windows with WSL2
 
@@ -32,9 +32,9 @@ npm install
 
 ### 3. Verify Installation
 
-**Check Python dependencies:**
+**Check Python dependencies** (from `backend/`, virtualenv active):
 ```bash
-python -c "import numpy, scipy, pydantic, fastapi; print('All dependencies OK')"
+python -c "import numpy, scipy, pydantic, fastapi, seem.api; print('All dependencies OK')"
 ```
 
 **Check Node dependencies:**
@@ -64,10 +64,9 @@ npm run dev
 
 Expected output:
 ```
-  VITE v5.4.8  ready in 120 ms
+  VITE  ready
 
-  ➜  Local:   http://localhost:5173/
-  ➜  press h + enter to show help
+  ➜  Local:   http://127.0.0.1:5173/
 ```
 
 ### Verify System Health
@@ -95,9 +94,11 @@ Response:
     "vsa": "operational",
     "banel": "operational",
     "dream_phase": "operational",
-    "shacl": "operational",
+    "shacl": "numeric-gates-only",
     "l0_graph": "operational"
-  }
+  },
+  "measured_invertibility": 1.0,
+  "claim": 0
 }
 ```
 
@@ -192,8 +193,8 @@ npm run dev -- --port 5174
 ### Making Changes to Backend
 
 1. Edit files in `backend/seem/`
-2. No restart needed (FastAPI auto-reloads)
-3. Test via API: `curl http://localhost:8000/...`
+2. Restart `python main.py` (reload is not enabled)
+3. Test via API: `curl http://127.0.0.1:8000/...`
 
 ### Making Changes to Frontend
 
@@ -275,24 +276,17 @@ DreamPhaseEngine(
 )
 ```
 
-## Integration with Supabase (Future)
+## Persistence
 
-When ready, persistence to Supabase:
+Not implemented. The API keeps VSA, BaNEL, Dream, and L0 state in process memory. Do not add a database URL. `rdflib`, `pyshacl`, and `supabase` are not dependencies; `SHACLValidator` only compares numbers to thresholds.
 
-```python
-from supabase import create_client
+## Tests
 
-supabase = create_client(
-    url=os.getenv("SUPABASE_URL"),
-    key=os.getenv("SUPABASE_KEY")
-)
+With the virtualenv active, from `backend/`:
 
-# Store L0 evidence
-supabase.table("evidence").insert({
-    "id": evidence.id,
-    "type": evidence.type,
-    "content": json.dumps(evidence.content)
-}).execute()
+```bash
+pytest -q
+python demo.py
 ```
 
 ## Deployment

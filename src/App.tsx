@@ -5,6 +5,8 @@ import VSAExplorer from './components/VSAExplorer';
 import BaNELMonitor from './components/BaNELMonitor';
 import DreamPhaseViewer from './components/DreamPhaseViewer';
 import L0GraphViewer from './components/L0GraphViewer';
+import SettingsPanel from './components/SettingsPanel';
+import { api } from './api';
 
 export type TabType = 'dashboard' | 'vsa' | 'banel' | 'dream' | 'l0' | 'settings';
 
@@ -15,7 +17,7 @@ function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch('http://localhost:8000/health');
+        const response = await fetch(api('/health'));
         setApiHealth(response.ok);
       } catch {
         setApiHealth(false);
@@ -87,12 +89,7 @@ function App() {
         {activeTab === 'banel' && <BaNELMonitor />}
         {activeTab === 'dream' && <DreamPhaseViewer />}
         {activeTab === 'l0' && <L0GraphViewer />}
-        {activeTab === 'settings' && (
-          <div className="bg-slate-800 rounded-lg border border-slate-700 p-8">
-            <h2 className="text-xl font-bold text-white mb-4">Settings</h2>
-            <p className="text-slate-400">Configuration options coming soon...</p>
-          </div>
-        )}
+        {activeTab === 'settings' && <SettingsPanel />}
       </main>
     </div>
   );

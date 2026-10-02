@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Brain, Zap, BarChart2 } from 'lucide-react';
+import { api } from '../api';
 
 export default function VSAExplorer() {
   const [roleId, setRoleId] = useState('');
   const [fillerId, setFillerId] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleBind = async () => {
@@ -16,7 +17,7 @@ export default function VSAExplorer() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/vsa/bind?role_id=${roleId}&filler_id=${fillerId}`,
+        api(`/vsa/bind?role_id=${encodeURIComponent(roleId)}&filler_id=${encodeURIComponent(fillerId)}`),
         { method: 'POST' }
       );
       const data = await response.json();
@@ -38,7 +39,7 @@ export default function VSAExplorer() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/vsa/invertibility?role_id=${roleId}&filler_id=${fillerId}`,
+        api(`/vsa/invertibility?role_id=${encodeURIComponent(roleId)}&filler_id=${encodeURIComponent(fillerId)}`),
         { method: 'POST' }
       );
       const data = await response.json();
@@ -145,9 +146,9 @@ export default function VSAExplorer() {
         <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">How It Works</h3>
           <p className="text-sm text-slate-400 leading-relaxed">
-            The Resonator VSA encodes symbols as complex hypervectors and uses element-wise binding
-            (⊙) with conjugate multiplication. Unbinding uses iterative resonance loops with sparsity
-            projection for invertibility verification.
+            Symbols are complex unit phasors. Bind is element-wise product. Unbind multiplies by the
+            conjugate of the role. The invertibility number on the result is measured, not assumed.
+            The 0.92 figure is the configured numeric gate. This is not a mind.
           </p>
         </div>
       </div>

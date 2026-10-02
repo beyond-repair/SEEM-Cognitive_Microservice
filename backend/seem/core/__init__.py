@@ -1,5 +1,5 @@
 from .vsa import ResonatorVSA, Hypervector
-from .types import Symbol, Role, Filler, Binding, MemSkill
+from .types import Symbol, Role, Filler, Binding, MemSkill, MemSkillLevel
 
 __all__ = [
     "ResonatorVSA",
@@ -9,4 +9,5 @@ __all__ = [
     "Filler",
     "Binding",
     "MemSkill",
+    "MemSkillLevel",
 ]
