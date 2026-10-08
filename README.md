@@ -42,6 +42,11 @@ pip install -r backend/requirements.txt
 npm install
 ```
 
+## CI
+
+`.github/workflows/kernel.yml` runs `pytest -q` from `backend/` on Python 3.11.
+A green run is an Actions conclusion. It does not raise the claim level above 0.
+
 ## Test
 
 From `backend/` with the venv active:
